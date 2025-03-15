@@ -12,7 +12,18 @@ open class AwesomeFcmService {
     static let TAG = "AwesomeFcmService"
     var contentInProgress:UNMutableNotificationContent?
     
+    static var pushInterceptor:PushNotificationInterceptor?
+    
     public init(){}
+    
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        if let interceptor = AwesomeFcmService.pushInterceptor {
+            interceptor.didRegisterForRemoteNotifications(withDeviceToken: deviceToken)
+        }
+    }
     
     public func didReceiveRemoteNotification(
         userInfo: [AnyHashable : Any],
@@ -37,6 +48,10 @@ open class AwesomeFcmService {
                 let timeInterval:Double = Double(nanoTime) / 1_000_000_000 // Technically could overflow for long running tests
                 Logger.shared.d(AwesomeFcmService.TAG, "Push notification finished in \(timeInterval.rounded())ms")
             }
+    }
+    
+    public static func setPushNotificationInterceptor(_ interceptor: PushNotificationInterceptor?) {
+        AwesomeFcmService.pushInterceptor = interceptor
     }
     
     public func executeRemoteInstructions(
@@ -192,6 +207,7 @@ open class AwesomeFcmService {
                 notificationId: notificationId,
                 contentInProgress: &contentInProgress,
                 shouldStopIfSilent: dontCallFlutter,
+                interceptor: AwesomeFcmService.pushInterceptor,
                 completion: executeCompletion
             )
         } catch {
@@ -219,8 +235,28 @@ open class AwesomeFcmService {
         notificationId: Int,
         contentInProgress: inout UNMutableNotificationContent,
         shouldStopIfSilent: Bool,
+        interceptor: PushNotificationInterceptor?,
         completion: @escaping (Bool, UNMutableNotificationContent?, Error?) -> ()
     ) throws -> Bool {
+        var userInfo:[AnyHashable : Any] = userInfo
+        
+        // Check for interception
+        if let interceptor = interceptor {
+            if let interceptedUserInfo = interceptor.intercept(userInfo: userInfo) {
+                // Successfully intercepted and modified userInfo
+                userInfo = interceptedUserInfo
+            } else {
+                // Interceptor decided to stop processing, handle as needed and returning .NoData
+                completion(false, contentInProgress, nil)
+                return false
+            }
+            if userInfo.isEmpty {
+                // Interceptor decided to stop processing, handle as needed and returning .NewData
+                completion(true, contentInProgress, nil)
+                return false
+            }
+        }
+        
         if isNotification(userInfo: userInfo) {
             return try deliveryAwesomeNotifications(
                 userInfo: userInfo,
