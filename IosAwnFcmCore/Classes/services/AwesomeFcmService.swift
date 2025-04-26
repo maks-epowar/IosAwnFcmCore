@@ -11,7 +11,7 @@ import IosAwnCore
 open class AwesomeFcmService {
     static let TAG = "AwesomeFcmService"
     var contentInProgress:UNMutableNotificationContent?
-    static weak var interceptorDelegate: AwesomeFcmInterceptorDelegate?
+    public static weak var interceptorDelegate: AwesomeFcmInterceptorDelegate?
     
     public init(){}
     
