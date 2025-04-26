@@ -11,6 +11,7 @@ import IosAwnCore
 open class AwesomeFcmService {
     static let TAG = "AwesomeFcmService"
     var contentInProgress:UNMutableNotificationContent?
+    static weak var interceptorDelegate: AwesomeFcmInterceptorDelegate?
     
     public init(){}
     
@@ -21,6 +22,9 @@ open class AwesomeFcmService {
         var contentInProgress = UNMutableNotificationContent()
         self.contentInProgress = contentInProgress
         let start = DispatchTime.now()
+        if let interceptorDelegate = AwesomeFcmService.interceptorDelegate, interceptorDelegate.handleRemoteNotification(userInfo: userInfo, fetchCompletionHandler: completionHandler) {
+            return true
+        }
         return executeRemoteInstructions(
             userInfo: userInfo,
             contentInProgress: &contentInProgress) { success, _, error in
